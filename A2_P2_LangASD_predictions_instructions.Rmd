@@ -49,6 +49,14 @@ How did your models from last time perform? In this exercise you have to compare
 
 pacman::p_load(readr,dplyr,stringr,lmerTest,Metrics,caret)
 
+demo_test<-read.csv("demo_test.csv")
+LU_test<-read.csv("LU_test.csv")
+token_test<-read.csv("token_test.csv")
+demo_train<-read.csv("demo_train.csv")
+LU_train<-read.csv("LU_train.csv")
+token_train<-read.csv("token_train.csv")
+
+
 ## Clean up function, included to inspire you
 
 CleanUpData <- function(Demo,LU,Word){
@@ -97,19 +105,40 @@ CleanUpData <- function(Demo,LU,Word){
 
   return(Data)
 }
+df_test<-CleanUpData(demo_test,LU_test,token_test)
+
+df_train<-CleanUpData(demo_train,LU_train,token_train)
 
 # Load training Data
 
 
 #- recreate the models you chose last time (just write the code again and apply it to Train Data)
+m1<-lmer(CHI_MLU~Visit*Diagnosis*verbalIQ1+(1+Visit|Child.ID),df_train)
 
+m2<-lmer(CHI_MLU~Visit*Diagnosis+verbalIQ1+Ethnicity+MOT_MLU+(1+Visit|Child.ID),df_train)
 
 #- calculate performance of the model on the training data: root mean square error is a good measure. (Tip: google the function rmse())
+#removing NA from CHI_MLU
+df_test<-subset(df_test,!is.na(CHI_MLU))
+predicted1<-predict(m1)
+predicted2<-predict(m2)
+rmse(df_train$CHI_MLU[!is.na(df_train$CHI_MLU)], predicted1)
 
+rmse(df_train$CHI_MLU[!is.na(df_train$CHI_MLU)], predicted2)
 
 
 #- create the test dataset (apply the code from assignment 1 or my function to clean up the 3 test datasets)
 # Test data
+predicttest1<-predict(m1,df_test)
+predicttest1
+
+predicttest2<-predict(m2,df_test)
+
+?predict()
+
+rmse(df_test$CHI_MLU[!is.na(df_test$CHI_MLU)], predicttest1)
+
+rmse(df_test$CHI_MLU[!is.na(df_test$CHI_MLU)], predicttest2)
 
 #- test the performance of the models on the test data (Tips: google the functions "predict()")
 
@@ -152,7 +181,7 @@ In this exercise you have to use cross-validation to calculate the predictive er
 [HERE GOES YOUR ANSWER]
 
 ### Exercise 3) Assessing the single child
-
+CVMS - cross validation
 Let's get to business. This new kiddo - Bernie - has entered your clinic. This child has to be assessed according to his group's average and his expected development.
 
 Bernie is one of the six kids in the test dataset, so make sure to extract that child alone for the following analysis.
