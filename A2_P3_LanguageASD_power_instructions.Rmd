@@ -38,6 +38,96 @@ You will be using:
 - extend() to simulate more participants
 
 ```{r}
+#load packages
+pacman::p_load(readr,dplyr,stringr,lmerTest,Metrics,caret)
+
+install.packages("simr")
+library(simr)
+#read the csvs
+demo_test<-read.csv("demo_test.csv")
+LU_test<-read.csv("LU_test.csv")
+token_test<-read.csv("token_test.csv")
+demo_train<-read.csv("demo_train.csv")
+LU_train<-read.csv("LU_train.csv")
+token_train<-read.csv("token_train.csv")
+
+
+## Riccardos clean up function 
+
+CleanUpData <- function(Demo,LU,Word){
+  
+  Speech <- merge(LU, Word) %>% 
+    rename(
+      Child.ID = SUBJ, 
+      Visit=VISIT) %>%
+    mutate(
+      Visit = as.numeric(str_extract(Visit, "\\d")),
+      Child.ID = gsub("\\.","", Child.ID)
+      ) %>%
+    dplyr::select(
+      Child.ID, Visit, MOT_MLU, CHI_MLU, types_MOT, types_CHI, tokens_MOT, tokens_CHI
+    )
+  
+  Demo <- Demo %>%
+    dplyr::select(
+      Child.ID, Visit, Ethnicity, Diagnosis, Gender, Age, ADOS, MullenRaw, ExpressiveLangRaw, Socialization
+    ) %>%
+    mutate(
+      Child.ID = gsub("\\.","", Child.ID)
+    )
+    
+  Data=merge(Demo,Speech,all=T)
+  
+  Data1= Data %>% 
+     subset(Visit=="1") %>% 
+     dplyr::select(Child.ID, ADOS, ExpressiveLangRaw, MullenRaw, Socialization) %>%
+     rename(Ados1 = ADOS, 
+            verbalIQ1 = ExpressiveLangRaw, 
+            nonVerbalIQ1 = MullenRaw,
+            Socialization1 = Socialization) 
+  
+  Data=merge(Data, Data1, all=T) %>%
+    mutate(
+      Child.ID = as.numeric(as.factor(as.character(Child.ID))),
+      Visit = as.numeric(as.character(Visit)),
+      Gender = recode(Gender, 
+         "1" = "M",
+         "2" = "F"),
+      Diagnosis = recode(Diagnosis,
+         "A"  = "TD",
+         "B"  = "ASD")
+    )
+
+  return(Data)
+}
+
+#cleaning up test and train data
+df_test<-CleanUpData(demo_test,LU_test,token_test)
+
+df_train<-CleanUpData(demo_train,LU_train,token_train)
+
+df<-merge(df_test,df_train, all=T)
+df$Child.ID<-as.factor(df$Child.ID)
+set.seed(123)
+df <- df[complete.cases(df[,c("CHI_MLU", "Diagnosis", "verbalIQ1", "Child.ID")]),]
+#run model
+model <- lmer(CHI_MLU ~1+ Visit*Diagnosis*verbalIQ1 + (1+Visit|Child.ID), df,Data.REML=F,control=lmerControl(optimizer="nloptwrap")
+model_0<-lmer(CHI_MLU~Visit+(1+Visit|Child.ID),df,Data.REML=F,control=lmerControl(optimizer="nloptwrap"),calc.derivs=FALSE)
+model_int<-lmer(CHI_MLU~Visit*verbalIQ1+(1+Visit|Child.ID),df,Data.REML=F,control=lmerControl(optimizer="nloptwrap"),calc.derivs=FALSE)
+
+fixef(model_0)["Visit"]<-0.08
+fixef(model)["Visit"]<-0.08
+fixef(model_int)["Visit"]<-0.08
+fixef(model)["DiagnosisASD"]<-0.08
+fixef(model)["verbalIQ1"]<-0.08
+
+
+powerSim(model_0,test=fixed("Visit"),nsim=20)
+powerSim(model_int,test=fixed("Visit"),nsim=20)
+
+
+model_extend<-extend(model, along="x", n=20)
+
 
 ```
 
